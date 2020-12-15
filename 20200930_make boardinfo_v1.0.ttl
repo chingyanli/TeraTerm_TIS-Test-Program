@@ -1,0 +1,35 @@
+; //////////////////////////////////// Info ////////////////////////////////////
+; ////  Description : Create the scan serial number
+; ////  
+; ////  
+; ////  by Noel Li at 2020-09-30
+; ////  
+; /////////////////////////////////////////////////////////////////////////////
+
+;===================Name Define===================
+;==serialFullStr == ¥dªO§Ç¸¹
+;====
+;====
+;====
+;====
+;====
+;==============================================
+
+
+;===================Main Program==================
+filedelete 'boardinfo.dat'
+goto StartBoardInfo
+
+
+
+
+:StartBoardInfo
+inputbox 'Please read the barcode of S/N label' 'Serial Number'
+serialFullStr = inputstr
+
+fileopen fhandle 'Boardinfo.dat' 0
+;filewrite fhandle 'Serial Number : '
+filewriteln fhandle serialFullStr
+
+
+fileclose fhandle

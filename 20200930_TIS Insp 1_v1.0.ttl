@@ -1,0 +1,649 @@
+; //////////////////////////////////// Info ////////////////////////////////////
+; ////  Description : insp 1
+; ////  處理進度
+; ////  測試SN: 209002273
+; ////  by Noel Li at 2020-09-30
+; ////  
+; /////////////////////////////////////////////////////////////////////////////
+
+;===================Name Define===================
+;==Current_DuringSampling==電流變數
+;==tempStr==通用暫存變數
+;==val==通用暫存變數
+;====
+;====
+;====
+;==============================================
+
+include '20200930_make Boardinfo_v1.0.ttl'
+
+filesearch 'Boardinfo.dat'
+if result = 1 then
+	FILEOUT = 1
+else
+	FILEOUT = 0
+	messagebox 'Can NOT create the board information file.Stop the inspection.' 'Stop the inspection'
+	end
+endif
+
+fileopen fhandle 'Boardinfo.dat' 0
+filereadln fhandle serial_number
+fileclose fhandle
+
+;strconcat serial_number '.dat'
+;fileopen fhandle serial_number 0
+
+gettime timestr "%Y%m%d%H%M%S"
+
+sprintf2 serial_number '%s_%s.log' timestr serial_number
+
+changedir 'C:\Users\user\Desktop\Script_'
+
+logopen serial_number 0 0
+logwrite '========== Measurement 1 Current consumption / Power supply / BIST function =========='#13#10
+logclose
+
+;===================Main Program==================
+bootchk_error=0
+timeout = 3
+; version 4.66 or later
+setbaud 460800
+
+messagebox 'Set the Serial port settings of TeraTerm for [TIS] cable' 'COM Port Setting' 1
+messagebox 'Click [OK] and Turn ON the test system' 'PowerUp' 1
+
+; 開機後先等5秒
+pause 2
+
+;--------------------Command: ADC ON--------------------
+; 治具給電的指令
+sendln  'adc off'
+;pause 1
+
+pause 5
+
+
+sendln  'adc on'
+pause 1
+
+waitln 'OK'
+
+sendln  'adc on'
+pause 1
+
+waitln 'OK'
+
+
+if result=1 then
+	logopen serial_number 0 1
+	logwrite 'PASS: ADC ON'#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:ADC ON' 'Error!'
+	bootchk_error=1
+	logwrite 'FAIL: ADC ON'#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;--------------------Setting: Vinput = 0[V]--------------------
+; Set DAC output level of jig board.
+
+sendln 'jig dac 0'
+pause 1
+
+waitln 'OK'
+
+if result=1 then
+	logopen serial_number 0 1
+	logwrite 'PASS: JIG DAC 0'
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL: JIG DAC 0' 'Error!'
+	bootchk_error=1
+	logwrite 'FAIL: JIG DAC 0'#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+sendln 'jig sample mux dac'
+pause 1
+
+waitln '0'
+
+if result=1 then
+	logopen serial_number 0 1
+	logwrite 'PASS: Settings_Vinput = 0[V]'#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:Settings_Vinput = 0[V]' 'Error!'
+	bootchk_error=1
+	logwrite 'FAIL: Settings_Vinput = 0[V]'#13#10
+	goto AbnormalEnd
+	logclose
+endif
+
+;--------------------Setting: UV = 0[V](UV-mode)--------------------
+; Pull UV signal line low or free it.
+
+sendln 'adc uv low'
+pause 1
+
+waitln 'OK'
+
+if result=1 then
+	logopen serial_number 0 1
+	logwrite 'PASS: UV = 0[V](UV-mode)'#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:UV = 0[V](UV-mode)' 'Error!'
+	bootchk_error=1
+	logwrite 'FAIL: UV = 0[V](UV-mode)'#13#10
+	goto AbnormalEnd
+	logclose
+endif
+
+;--------------------Setting: TISIDEN = 0[V](Box 1)--------------------
+; Pull IDEN signal line low or free it.
+
+sendln 'adc iden low'
+pause 1
+
+wait 'OK'
+pause 1
+
+sendln 'adc mid 0'
+pause 1
+
+waitln '0'
+
+if result=1 then
+	logopen serial_number 0 1
+	logwrite 'PASS: TISIDEN = 0[V](Box 1)'#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:TISIDEN = 0[V](Box 1)' 'Error!'
+	bootchk_error=1
+	logwrite 'FAIL: TISIDEN = 0[V](Box 1)'#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;--------------------Setting: Gain = 0[dB]--------------------
+; Set gain value of ADC box.
+
+sendln 'adc gain 0'
+pause 1
+
+waitln 'E0'
+
+if result=1 then
+	logopen serial_number 0 1
+	logwrite 'PASS: Gain = 0[dB]'#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:Gain = 0[dB]' 'Error!'
+	bootchk_error=1
+	logwrite 'FAIL: Gain = 0[dB]'#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;--------------------Meansurment Current(No sampling)--------------------
+; Meansurment Current(No sampling) 20[mA]< X < 40[mA]
+
+inputbox 'I(During smpling):20[mA]< X < 40[mA]' '量測電流'
+Current_DuringSampling = inputstr
+str2int val Current_DuringSampling
+
+if val>20 && val<40 then
+	logopen serial_number 0 1
+	sprintf2 tempStr 'PASS: Current_No Sampling = %d[mA]' val
+	logwrite tempStr
+	logwrite ' '#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr 'FAIL: Current_No Sampling = %d[mA]' val
+	logwrite tempStr
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+pause 1
+
+;--------------------Meansurment Current(During sampling)--------------------
+; Meansurment Current(During sampling) 20[mA]< X < 50[mA]
+
+sendln 'adc tr st'
+pause 10
+
+inputbox 'I(During smpling):20[mA]< X < 50[mA]' '量測電流'
+Current_DuringSampling = inputstr
+str2int val Current_DuringSampling
+
+sendln 'adc tr'
+pause 1
+
+if val>20 && val<50 then
+	logopen serial_number 0 1
+	sprintf2 tempStr 'PASS: Current_DuringSampling = %d[mA]' val
+	logwrite tempStr
+	logwrite ' '#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr 'FAIL: Current_DuringSampling = %d[mA]' val
+	logwrite tempStr
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+pause 1
+;--------------------Meansurment VP_BIAS_SENSOR--------------------
+; Meansurment VP_BIAS_SENSOR 7[V] < V < 13[V]
+flushrecv
+
+sendln 'jig sample 10v'
+pause 1
+
+waitregex '^\d{4,5}'
+VP_BIAS_SENSOR = inputstr
+str2int val VP_BIAS_SENSOR
+if val>7000 && val<13000 then
+	logopen serial_number 0 1
+	sprintf2 tempStr 'PASS: VP_BIAS_SENSOR = %d[mV]' val
+	logwrite tempStr
+	logwrite ' '#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr 'FAIL: VP_BIAS_SENSOR = %d[mV]' val
+	logwrite tempStr
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;--------------------Meansurment VP_REF--------------------
+; Meansurment VP_REF 1.96[V] < V < 2.04[V]
+flushrecv
+
+sendln 'jig sample 2v'
+pause 1
+
+waitregex '^\d{4}'
+VP_REF = inputstr
+str2int val VP_REF
+if val>1960 && val<2040 then
+	logopen serial_number 0 1
+	sprintf2 tempStr 'PASS: VP_REF = %d[mV]' val
+	logwrite tempStr
+	logwrite ' '#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr 'FAIL: VP_REF = %d[mV]' val
+	logwrite tempStr
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;--------------------Meansurment VP_SENSOR--------------------
+; Meansurment VP_SENSOR 3.9[V] < V < 5[V]
+flushrecv
+
+sendln 'jig sample 5v'
+pause 1
+
+waitregex '^\d{4}'
+VP_SENSOR = inputstr
+str2int val VP_SENSOR
+if val>3900 && val<5000 then
+	logopen serial_number 0 1
+	sprintf2 tempStr 'PASS: VP_SENSOR = %d[mV]' val
+	logwrite tempStr
+	logwrite ' '#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr 'FAIL: VP_SENSOR = %d[mV]' val
+	logwrite tempStr
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;--------------------BIST function check--------------------
+; BIST function check.
+
+sendln 'adc mode bist'
+pause 1
+
+waitln 'F0'
+
+if result=1 then
+	logopen serial_number 0 1
+	logwrite'PASS: BIST function check'#13#10
+	logclose
+else
+	logopen serial_number 0 1
+	messagebox 'FAIL:BIST function check' 'Error!'
+	bootchk_error=1
+	logwrite'FAIL: BIST function check'#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+messagebox 'PASS: Insp1' ' '
+
+sendln 'adc gain 35'
+pause 1
+
+sendln 'adc mode 0'
+pause 1
+
+;--------------------Meansurment Offset Voltage--------------------
+
+logopen serial_number 0 1
+logwrite '========== Measurement 2 Offset Voltage =========='#13#10
+logclose
+
+; Offset Voltage 610[mV] < V < 640[mV]
+
+sendln 'jig dac 3967'
+pause 1
+
+wait 'OK'
+
+sendln 'jig mux dac'
+pause 1
+
+sendln 'jig sample mux'
+pause 1
+
+sendln 'adc uv low'
+pause 1
+
+wait 'OK'
+
+sendln 'adc iden low'
+pause 1
+
+wait 'OK'
+
+sendln 'adc mid 0'
+pause 1
+
+wait '0'
+
+sendln 'adc gain 0'
+pause 1
+
+wait 'E0'
+
+sendln 'adc tr'
+pause 1
+
+waitregex '\d{3}.\d{1}\t\d{3}.\d{1}\t\d{3}.\d{1}\t\d{3}.\d{1}\t'
+OffsetVoltage = inputStr
+
+strsplit OffsetVoltage '	'
+
+str2int val1 groupmatchstr1
+str2int val2 groupmatchstr2
+str2int val3 groupmatchstr3
+str2int val4 groupmatchstr4
+str2int val5 groupmatchstr5
+
+;//////////////////////CH1
+
+if val1>610 && val1<700 then
+	logopen serial_number 0 1
+	sprintf2 tempStr1 'PASS: Offset Voltage(CH1) = %s[mV]' groupmatchstr1
+	logwrite tempStr1
+	logwrite ' '#13#10
+	logclose
+else
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr1 'FAIL: Offset Voltage(CH1) = %s[mV]' groupmatchstr1
+	logwrite tempStr1
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;//////////////////////CH2
+
+if val2>610 && val2<700 then
+	logopen serial_number 0 1
+	sprintf2 tempStr2 'PASS: Offset Voltage(CH2) = %s[mV]' groupmatchstr2
+	logwrite tempStr2
+	logwrite ' '#13#10
+	logclose
+else
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr2 'FAIL: Offset Voltage(CH2) = %s[mV]' groupmatchstr2
+	logwrite tempStr2
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;//////////////////////CH3
+
+if val3>610 && val3<700 then
+	logopen serial_number 0 1
+	sprintf2 tempStr3 'PASS: Offset Voltage(CH3) = %s[mV]' groupmatchstr3
+	logwrite tempStr3
+	logwrite ' '#13#10
+	logclose
+else
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr3 'FAIL: Offset Voltage(CH3) = %s[mV]' groupmatchstr3
+	logwrite tempStr3
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;//////////////////////CH4
+
+if val4>610 && val4<700 then
+	logopen serial_number 0 1
+	sprintf2 tempStr4 'PASS: Offset Voltage(CH4) = %s[mV]' groupmatchstr4
+	logwrite tempStr4
+	logwrite ' '#13#10
+	logclose
+else
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr4 'FAIL: Offset Voltage(CH4) = %s[mV]' groupmatchstr4
+	logwrite tempStr4
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;//////////////////////CH5
+
+if val5>610 && val5<700 then
+	logopen serial_number 0 1
+	sprintf2 tempStr5 'PASS: Offset Voltage(CH5) = %s[mV]' groupmatchstr5
+	logwrite tempStr5
+	logwrite ' '#13#10
+	logclose
+else
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr5 'FAIL: Offset Voltage(CH5) = %s[mV]' groupmatchstr5
+	logwrite tempStr5
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+messagebox 'PASS: Insp2' ' '
+
+;--------------------Meansurment Programmable Gain Amplifier--------------------
+
+logopen serial_number 0 1
+logwrite '========== Measurement 3 Programmable Gain Amplifier =========='#13#10
+logclose
+
+;--------------------Meansurment DUV-mode--------------------
+
+logopen serial_number 0 1
+logwrite '========== Measurement 4 DUV Mode =========='#13#10
+logclose
+
+; DUV Mode 1230[mV] < V < 1530[mV]
+
+sendln 'jig mux op'
+pause 1
+
+sendln 'jig sample mux'
+pause 1
+
+sendln 'adc gain 0'
+pause 1
+
+sendln 'adc uv free'
+pause 1
+
+sendln 'adc duvtest'
+pause 1
+
+waitregex '\d{4}.\d{1}\t\d{4}.\d{1}\t\d{4}.\d{1}\t\d{4}.\d{1}\t'
+OffsetVoltage = inputStr
+
+strsplit OffsetVoltage '	'
+
+str2int val1 groupmatchstr1
+str2int val2 groupmatchstr2
+str2int val3 groupmatchstr3
+str2int val4 groupmatchstr4
+str2int val5 groupmatchstr5
+
+;//////////////////////CH1
+
+if val1>1230 && val1<1530 then
+	logopen serial_number 0 1
+	sprintf2 tempStr1 'PASS: DUV Mode(CH1) = %s[mV]' groupmatchstr1
+	logwrite tempStr1
+	logwrite ' '#13#10
+	logclose
+else
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr1 'FAIL: DUV Mode(CH1) = %s[mV]' groupmatchstr1
+	logwrite tempStr1
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;//////////////////////CH2
+
+if val2>1230 && val2<1530 then
+	logopen serial_number 0 1
+	sprintf2 tempStr2 'PASS: DUV Mode(CH2) = %s[mV]' groupmatchstr2
+	logwrite tempStr2
+	logwrite ' '#13#10
+	logclose
+else
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr2 'FAIL: DUV Mode(CH2) = %s[mV]' groupmatchstr2
+	logwrite tempStr2
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;//////////////////////CH3
+
+if val3>1230 && val3<1530 then
+	logopen serial_number 0 1
+	sprintf2 tempStr3 'PASS: DUV Mode(CH3) = %s[mV]' groupmatchstr3
+	logwrite tempStr3
+	logwrite ' '#13#10
+	logclose
+else
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr3 'FAIL: DUV Mode(CH3) = %s[mV]' groupmatchstr3
+	logwrite tempStr3
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;//////////////////////CH4
+
+if val4>1230 && val4<1530 then
+	logopen serial_number 0 1
+	sprintf2 tempStr4 'PASS: DUV Mode(CH4) = %s[mV]' groupmatchstr4
+	logwrite tempStr4
+	logwrite ' '#13#10
+	logclose
+else
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr4 'FAIL: DUV Mode(CH4) = %s[mV]' groupmatchstr4
+	logwrite tempStr4
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+;//////////////////////CH5
+
+if val5>1230 && val5<1530 then
+	logopen serial_number 0 1
+	sprintf2 tempStr5 'PASS: DUV Mode(CH5) = %s[mV]' groupmatchstr5
+	logwrite tempStr5
+	logwrite ' '#13#10
+	logclose
+else
+	messagebox 'FAIL:Out of range.' 'Error!'
+	bootchk_error=1
+	sprintf2 tempStr5 'FAIL: DUV Mode(CH5) = %s[mV]' groupmatchstr5
+	logwrite tempStr5
+	logwrite ' '#13#10
+	logclose
+	goto AbnormalEnd
+endif
+
+messagebox 'ALL PASS!!' ' '
+
+end
+
+;===================AbnormalEnd Area==================
+:AbnormalEnd
+messagebox 'Measurement 1 test is not complete! Turn off the power.' 'Error!'
+logclose
+end
+
